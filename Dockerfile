@@ -24,11 +24,15 @@ COPY ./runWithProvider.js ./
 
 COPY ./Docker ./Docker
 
+ARG DATABASE_PROVIDER
+ARG DATABASE_URL
+ENV DATABASE_PROVIDER=${DATABASE_PROVIDER}
+ENV DATABASE_URL=${DATABASE_URL}
+
 RUN chmod +x ./Docker/scripts/* && dos2unix ./Docker/scripts/*
-
-RUN ./Docker/scripts/generate_database.sh
-
+RUN echo "[DEBUG] Provider durante build: $DATABASE_PROVIDER" && ./Docker/scripts/generate_database.sh
 RUN npm run build
+
 
 FROM node:24-alpine AS final
 
