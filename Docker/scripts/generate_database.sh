@@ -2,30 +2,50 @@
 
 source ./Docker/scripts/env_functions.sh
 
-if [[ "$DOCKER_ENV" == "true" ]]; then
+if [ "$SOCKER_ENV" == "true" ]; then
   export_env_vars
 fi
 
-if [[ "$DATABASE_PROVIDER" == "postgresql" || "$DATABASE_PROVIDER" == "mysql" || "$DATABASE_PROVIDER" == "psql_bouncer" ]]; then
-  export DATABASE_URL
-  echo "Generating database for $DATABASE_PROVIDER"
-  echo "Database URL: $DATABASE_URL"
+# ---------------------------------------------------
+# DEBUG - Mostrar valor da variável no build
+# ---------------------------------------------------
+echo "[DEBUG] DATABASE_PROVIDER (raw) = '$DATABASE_PROVIDER'"
 
-  if [[ "$DATABASE_PROVIDER" == "psql_bouncer" ]]; then
-    npx prisma generate --schema=prisma/psql_bouncer-schema.prisma
-  elif [[ "$DATABASE_PROVIDER" == "postgresql" ]]; then
-    npx prisma generate --schema=prisma/postgresql-schema.prisma
-  elif [[ "$DATABASE_PROVIDER" == "mysql" ]]; then
-    npx prisma generate --schema=prisma/mysql-schema.prisma
-  fi
+# Normaliza pra minúsculo e remove espaços
+PROVIDER="$(printf '%s' "$DATABASE_PROVIDER" | tr '[:upper:]' '[:lower:]' | xargs)"
 
-  if [ $? -ne 0 ]; then
-    echo "❌ Prisma generate failed"
+# ---------------------------------------------------
+# Seleciona schema conforme o provider
+# ---------------------------------------------------
+case "$PROVIDER" in
+  postgres|postgresql|pg)
+    SCHEMA="./prisma/postgresql-schema.prisma"
+    ;;
+  psql_bouncer|psql-bouncer|bouncer)
+    SCHEMA="./prisma/psql_bouncer-schema.prisma"
+    ;;
+  mysql|maria|mariadb)
+    SCHEMA="./prisma/mysql-schema.prisma"
+    ;;
+  *)
+    echo "[ERROR] DATABASE_PROVIDER='$DATABASE_PROVIDER' inválido."
+    echo "        Use: postgres | postgresql | mysql | psql_bouncer"
     exit 1
-  else
-    echo "✅ Prisma generate succeeded"
-  fi
+    ;;
+esac
+
+echo "[DEBUG] Provider normalizado = '$PROVIDER'"
+echo "[DEBUG] Schema selecionado = '$SCHEMA'"
+
+# ---------------------------------------------------
+# Geração do Prisma Client
+# ---------------------------------------------------
+npx prisma generate --schema "$SCHEMA"
+EXIT=$?
+
+if [ $EXIT -ne 0 ]; then
+  echo "[ERROR] Prisma generate falhou (exit $EXIT)"
+  exit $EXIT
 else
-  echo "❌ Error: Database provider $DATABASE_PROVIDER invalid."
-  exit 1
+  echo "[INFO] Prisma generate concluído com sucesso usando '$SCHEMA'"
 fi
